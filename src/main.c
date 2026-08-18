@@ -3,6 +3,7 @@
 #include "reaction.h"
 #include "particles.h"
 #include "grid_ui.h"
+#include "beaker.h"
 
 #include <stdlib.h>
 #include <time.h>
@@ -24,7 +25,7 @@ int main(void)
     ReactionResult last_result = { REACT_NONE, 0.0f, WHITE, 0, "No reaction yet." };
     int has_reacted = 0;
 
-    Vector2 reaction_point = { SCREEN_W / 2.0f, 600.0f };
+    Beaker beaker = beaker_init((Vector2){ SCREEN_W / 2.0f - 70.0f, 500.0f }, 140.0f, 160.0f);
 
     while (!WindowShouldClose())
     {
@@ -40,19 +41,19 @@ int main(void)
             SelectionStage prev_stage = ui.stage;
             grid_ui_confirm_selection(&ui);
 
-            // stage just transitioned A -> B: both elements are locked in, react
             if (prev_stage == SELECT_A && ui.stage == SELECT_B)
             {
                 last_result = reaction_compute(ui.selected_a, ui.selected_b);
                 has_reacted = 1;
-                particles_spawn_burst(&ps, reaction_point, &last_result);
+                beaker_trigger(&beaker, &last_result);
+                particles_spawn_burst(&ps, beaker_liquid_point(&beaker), &last_result);
             }
 
-            // stage just transitioned B -> NONE (third confirm): clear the board
             if (prev_stage == SELECT_B && ui.stage == SELECT_NONE)
             {
                 has_reacted = 0;
                 particles_clear(&ps);
+                beaker_clear(&beaker);
             }
         }
 
@@ -60,17 +61,18 @@ int main(void)
         {
             grid_ui_reset_selection(&ui);
             particles_clear(&ps);
+            beaker_clear(&beaker);
             has_reacted = 0;
         }
 
         particles_update(&ps, dt);
+        beaker_update(&beaker, dt);
 
         BeginDrawing();
         ClearBackground(RAYWHITE);
 
         grid_ui_draw(&ui);
 
-        // reaction result panel, below the grid + hud line
         int panel_y = 500;
         DrawText("Reaction:", 20, panel_y, 22, DARKGRAY);
 
@@ -85,14 +87,13 @@ int main(void)
             char intensity_line[64];
             snprintf(intensity_line, sizeof(intensity_line), "Intensity: %.2f", last_result.intensity);
             DrawText(intensity_line, 20, panel_y + 80, 16, GRAY);
-
-            DrawCircleV(reaction_point, 18.0f, last_result.result_color);
         }
         else
         {
             DrawText("Pick two elements and press Enter to react.", 20, panel_y + 30, 18, DARKGRAY);
         }
 
+        beaker_draw(&beaker);
         particles_draw(&ps);
 
         DrawText("Arrows: move   Enter/Space: select/react   R: reset", 20, SCREEN_H - 30, 16, GRAY);
